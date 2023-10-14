@@ -82,6 +82,148 @@ The tool can be accessed through the link: http://localhost:3000/#/
 To access the features of the tool it is necessary to have a metamask wallet. All instructions for creating, importing, and getting backgrounds are on the tool's documentation page.
 
 
+## Upgrading Smart Contracts Using Remix
+
+
+To create smart contracts on the Ethereum blockchain, developers might require an environment that simplifies the development process, provides useful tools and features, and streamlines the testing and debugging of smart contracts. [Remix IDE](https://remix.ethereum.org/) fulfills these requirements and is widely used by developers for Solidity Smart Contract Development.
+
+In this Tutorial, we will cover how to use Remix IDE for Solidity Smart Contract deployment and upgrading using our proposed methodology.
+
+
+**Step 1: Set up the Remix Environment**
+
+In order to deploy or update a smart contract using Remix, it must be connected to a MetaMask wallet and run in the Injected Web3 environment. In Remix go to Deploy & Run Transactions and select an Injected provider - Metamask from the dropdown.
+
+![step1](https://github.com/formalblocks/safeevolutionrefinement/assets/16063988/76b92e34-f1a7-4fcf-9de8-0b426e9501d2)
+
+
+**Step 2: Create a ToyWallet Smart Contract in Remix**
+
+We can create a **ToyWallet.sol** contract by clicking on the “+” button in the file explorer section. Alternatively, we can import an existing contract by clicking on the folder icon and selecting the contract file from the local system.
+
+![step2](https://github.com/formalblocks/safeevolutionrefinement/assets/16063988/ad2c1d09-4830-4b62-aede-a5e186873a41)
+
+
+```solidity
+contract ToyWallet {
+	mapping (address => uint) accs;
+	
+	function deposit () payable public {
+		accs[msg.sender] = accs[msg.sender] + msg.value;
+	}
+	
+	function withdraw (uint value) public {
+		require(accs[msg.sender] >= value);
+		bool ok = msg.sender.send(value);
+		require(ok);
+		accs[msg.sender] = accs[msg.sender] - value;
+	}
+}	
+```
+
+**Step 4: Compile the Smart Contract**
+
+In the Remix IDE interface, go to the “Solidity Compiler” tab on the left sidebar. Choose the desired compiler version from the drop-down menu. Click on the button to compile the loaded smart contract.
+
+![step3](https://github.com/formalblocks/safeevolutionrefinement/assets/16063988/14b9f06a-202b-4eab-86bd-2d116493ae76)
+
+
+**Step 5: Connect Remix to MetaMask**
+
+In the Remix IDE interface, click on the “Deploy & run transactions” tab on the left sidebar. Under the “Environment” section, select “WalletConnect” (it’s called Injected Web3 in previous versions of Remix IDE) from the drop-down menu. This will connect Remix IDE to your wallet, in this tutorial’s case Metamask wallet.
+
+
+**Step 6: Deploy a Smart Contract on a Network**
+
+In order to deploy the smart contract, we should first select it from the dropdown and then click on the deploy button. 
+
+![step6](https://github.com/formalblocks/safeevolutionrefinement/assets/16063988/7a9e59a2-edcd-4b51-b835-b90a4811d179)
+
+
+**Step 7: Create a Proxy Smart Contract in Remix**
+
+We can create or import a **Proxy.sol** contract in the file explorer section. We should provide to its constructor the facet address (ToyWallet), the trusted deployer address and the init function contract address.
+
+```solidity
+contract Proxy {
+
+address facet;
+address trusted_deployer;
+
+constructor(address _facet, address _trusted_deployer, address _constructor) public {
+    facet = _facet;
+    trusted_deployer = _trusted_deployer;
+    _constructor.delegatecall(abi.encodeWithSignature("cons()"));
+}
+event Fallback();
+
+function update(address _facet, address _init) public {
+    require(msg.sender == trusted_deployer);
+    facet = _facet;
+    if (_init != address(0)){
+        _init.delegatecall(abi.encodeWithSignature("init()"));
+    }
+}
+
+function() external payable {
+
+  address _facet = facet;
+
+    emit Fallback();
+
+  assembly {
+    calldatacopy(0, 0, calldatasize())
+    let result := delegatecall(gas(), _facet, 0, calldatasize(), 0, 0)
+    returndatacopy(0, 0, returndatasize())
+    switch result
+      case 0 {revert(0, returndatasize())}
+      default {return (0, returndatasize())}
+  }
+}
+
+}
+```
+
+**Step 8: Create a ToyWalletNew Smart Contract in Remix**
+
+We can create or import a **ToyWalletNew.sol** contract in the file explorer section.
+
+
+```solidity
+contract ToyWalletNew {
+
+  struct Account {
+		uint bal;
+		bool is_open;
+	}
+
+	mapping (address => Account) accs;
+	
+	function deposit () payable public {
+		accs[msg.sender].bal = accs[msg.sender].bal + msg.value;
+	}
+	
+	function withdraw (uint value) public {
+		require(accs[msg.sender].bal >= value);
+		bool ok = msg.sender.send(value);
+		require(ok);
+		accs[msg.sender].bal = accs[msg.sender].bal - value;
+	}
+
+  function open () public view returns (bool) {
+		return accs[msg.sender].is_open;
+	}
+}	
+```
+
+**Step 9: Update Proxy Smart Contract**
+
+To upgrade a smart contract, we should invoke the proxy update function by providing the facet address (ToyWalletNew) and init function contract address.
+
+![step9](https://github.com/formalblocks/safeevolutionrefinement/assets/16063988/ec0e9142-3a30-4493-8560-bf5d93227c67)
+
+
+
 
 
 
