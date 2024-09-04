@@ -1,0 +1,6 @@
+compiler:
+    evm_version: null
+    solc:
+        version: 0.5.0
+        optimizer:
+            enabled: true

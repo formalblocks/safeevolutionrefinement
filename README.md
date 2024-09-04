@@ -55,10 +55,17 @@ The ERC-721 standard defines a minimum interface a smart contract must implement
 
 In order to build the docker container and verify the smart contracts in this repository. Please follow the instructions presented in [solc-verify](https://github.com/SRI-CSL/solidity/blob/boogie/docker/README.md) github page.
 
-## Running The Verification Script
+## Running The Trusted Deployer Tool
+
+First you should execute the following commands:
 
 
-This Docker allows us to quickly run the Verification Tool.
+```
+cd inv-evo
+docker build -t alloy .  
+```
+
+The Docker file on the rooot folder allows us to quickly run the Verification Tool.
 To build the tool in a docker container you should clone the project and  run the the following commands:
 
 ```
@@ -80,6 +87,42 @@ docker-compose up --build tool
 The tool can be accessed through the link: http://localhost:3000/#/
 
 To access the features of the tool it is necessary to have a metamask wallet. All instructions for creating, importing, and getting backgrounds are on the tool's documentation page.
+
+
+
+
+
+ ## Smart Contract Creation Process
+
+
+To increase the security of the tool, we do not store or manage the user's private key, instead we use a 
+custodial crypto wallet so the user is not in control of the funds and contracts deployed. 
+
+    
+To understand the implementation challenges for registering contracts on the blockchain, it is necessary to evaluate the processes related to the Trusted Deployer tool's deployer module. Figure below shows a screenshot of the creation smart contract process, according to the workflow, 
+that will ensure for all participants that interact with the 
+smart contract that a given instance was created by the Trusted Deployer by calling its get-spec function; therefore it is formally verified and safe. The user must also upload the specification and implementation files. Solidity supports multiple inheritance, so multiple contracts can be inherited by a contract that is known as a derived contract. In this case the user must inform the derived contract to be verified and constructor parameters when they exist. 
+
+
+<img src="images/deploypicture.png" alt="Deploy Screen" width="800" height="400">
+
+
+
+ ## Smart Contract Upgrading Process
+
+
+Considering the good practices to handle the wallet described in the previous section, 
+                    we defined a procedure to upgrade smart contracts. From the moment a connection is 
+                    established between the wallet and the, the user has access to the historical data 
+                    generated from the smart contract deployment. After input of and implementation 
+                    smart contract, the tool must check if there is a record of a corresponding specification; 
+                    if there is, the update process will occur automatically. In this case only the implementation 
+                    smart contract is sent to the blockchain and its address is registered in the proxy.
+
+
+
+<img src="images/updatepicture.png" alt="Update Screen" width="800" height="400">
+
 
 
 ## Upgrading Smart Contracts Using Remix
@@ -225,28 +268,14 @@ To upgrade a smart contract, we should invoke the proxy update function by provi
 
 
 
-
-
 ##  Citing
 
 This research is a part of effort to extend the work that we present in the 20th International Conference on
-Software Engineering and Formal Methods [[1]](#1); If you want to refer to our previous work, please use the following BibTeX entry for citation.
+Software Engineering and Formal Methods [[1]](#1); and the  Software and Systems Modeling journal that focuses on theoretical and practical issues in the development and application of software and system modeling languages, techniques, and methods, such as the Unified Modeling Language [[2]](#2). If you want to refer to our previous work, please use the following BibTeX entry for citations.
 
-```
-@InProceedings{10.1007/978-3-031-17108-6_14,
-    author="Antonino, Pedro and Ferreira, Juliandson and Sampaio, Augusto and Roscoe, A. W.",
-    editor="Schlingloff, Bernd-Holger and Chai, Ming",
-    title="Specification is Law: Safe Creation and Upgrade of Ethereum Smart Contracts",
-    booktitle="Software Engineering and Formal Methods",
-    year="2022",
-    publisher="Springer International Publishing",
-    address="Cham",
-    pages="227--243",
-    abstract="Smart contracts are the building blocks of the 'code is law' paradigm: the smart contract's code indisputably describes how its assets are to be managed - once it is created, its code is typically immutable. Faulty smart contracts present the most significant evidence against the practicality of this paradigm; they are well-documented and resulted in assets worth vast sums of money being compromised. To address this issue, the Ethereum community proposed (i) tools and processes to audit/analyse smart contracts, and (ii) design patterns implementing a mechanism to make contract code mutable. Individually, (i) and (ii) only partially address the challenges raised by the 'code is law' paradigm. In this paper, we combine elements from (i) and (ii) to create a systematic framework that moves away from 'code is law' and gives rise to a new 'specification is law' paradigm. It allows contracts to be created and upgraded but only if they meet a corresponding formal specification. The framework is centered around a trusted deployer: an off-chain service that formally verifies and enforces this notion of conformance. We have prototyped this framework, and investigated its applicability to contracts implementing three widely used Ethereum standards: the ERC20 Token Standard, ERC3156 Flash Loans and ERC1155 Multi Token Standard, with promising results.",
-    isbn="978-3-031-17108-6"
-}
-```
 
 ##  References
 
 <a id="1">[1] Antonino, P., Ferreira, J., Sampaio, A., Roscoe, A.W. (2022). Specification is Law: Safe Creation and Upgrade of Ethereum Smart Contracts. In: Schlingloff, BH., Chai, M. (eds) Software Engineering and Formal Methods. SEFM 2022. Lecture Notes in Computer Science, vol 13550. Springer, Cham. https://doi.org/10.1007/978-3-031-17108-6_14
+
+<a id="2">[2] Antonino, P., Ferreira, J., Sampaio, A. et al. A refinement-based approach to safe smart contract deployment and evolution. Softw Syst Model 23, 657–693 (2024). https://doi.org/10.1007/s10270-023-01143-z

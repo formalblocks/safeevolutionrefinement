@@ -1,0 +1,200 @@
+open util/integer
+
+abstract sig Type {}
+sig Str, Address, Uint, MappingType extends Type {}
+abstract sig Version {}
+{% macro sim_macro(simulation) -%}Sim{{simulation.id}}{%- endmacro %}
+{% macro value_macro(assignment) -%}{{assignment.value}}{%- endmacro %}
+{% macro mapping_macro(var, sim) -%}Mapping_{{var.type.name}}_{{var.name}}_{{var.version.name}}_Sim{{sim.id}}{%- endmacro %}
+{% macro version_macro(version) -%}{{version.name | capitalize}}{%- endmacro %}
+{% macro var_macro(var) -%}Var_{{var.name | replace(".","_") }}_{{var.version.name}}{%- endmacro %}
+{% macro assignment_sig_macro(var) -%}Assignment_{{var.type.name}}_{{var.name | replace(".","_") }}_{{var.version.name}}{%- endmacro %}
+
+one sig {% for version in versions %}{{version_macro(version)}}{% if not loop.last %}, {% endif %}{% endfor %} extends Version {}
+abstract sig SimulationId {}
+
+abstract sig Mapping {
+  element: Int -> Int,
+  length: one Int
+}
+
+abstract sig Variable {
+name: String,
+type:  Type,
+version: one Version
+}
+
+
+abstract sig Assignment {
+    variable: one Variable,
+    value: SimulationId -> (Int + Mapping) 
+ }
+
+
+abstract sig Expression {
+    variables: set Variable,
+    evaluation:  SimulationId -> one (Int + Mapping)
+}
+
+sig SimpleAssignmentExpression extends Expression {
+  assignment: one Assignment
+} 
+
+
+fact {
+  all a: SimpleAssignmentExpression |
+    a.variables = a.assignment.variable and
+    all simId : domain[a.evaluation] |
+        not (univ.(a.assignment.value) in Mapping) and
+        eq[int a.evaluation[simId], int a.assignment.value[simId]]
+}
+
+
+sig MappingAssignmentExpression extends Expression {
+  assignment: one Assignment
+} 
+
+fact {
+  all exp: MappingAssignmentExpression | 
+    exp.assignment.variable.type in MappingType and
+    exp.variables = exp.assignment.variable and
+    all simId : domain[exp.evaluation] |
+        exp.evaluation[simId].element = exp.assignment.value[simId].element
+}
+
+sig PrimitiveExpression extends Expression {} {
+  no variables
+  and (all simId, simId2: domain[evaluation] | 
+      not Mapping in evaluation[simId] and
+      eq[int evaluation[simId], int evaluation[simId2]])
+}
+
+abstract sig BinaryExpression extends Expression {
+  left: one Expression,
+   right: one Expression
+}
+
+sig SumExpression extends ScalarExpression {}
+
+fact {
+    all s: SumExpression | 
+        s.variables = s.left.variables + s.right.variables 
+        and (all simId: domain[s.evaluation] |
+               s.evaluation[simId] = add[int s.left.evaluation[simId], int s.right.evaluation[simId]])
+        and no s & (s.^left + s.^right)
+}
+
+
+sig SumMapExpression extends IndexedExpression {}
+
+fact {
+    all s: SumMapExpression | 
+        s.variables = s.left.variables + s.right.variables 
+        and (all simId: domain[s.evaluation] | 
+               all index: univ.element.univ | 
+                    some s.right.evaluation[simId].element implies {
+                                s.evaluation[simId].element[index] = add[int s.left.evaluation[simId].element[index], int s.right.evaluation[simId].element[index]]
+                    } else {
+                                 s.evaluation[simId].element[index] = add[int s.left.evaluation[simId].element[index], int s.right.evaluation[simId]] 
+                    })
+        and no s & (s.^left + s.^right)
+}
+
+sig MulMapExpression extends IndexedExpression {}
+
+fact {
+    all s: MulMapExpression | 
+        s.variables = s.left.variables + s.right.variables 
+        and (all simId: domain[s.evaluation] | 
+               all index: univ.element.univ | 
+                    some s.right.evaluation[simId].element implies {
+                                s.evaluation[simId].element[index] = mul[int s.left.evaluation[simId].element[index], int s.right.evaluation[simId].element[index]]
+                    } else {
+                                 s.evaluation[simId].element[index] = mul[int s.left.evaluation[simId].element[index], int s.right.evaluation[simId]] 
+                    })
+        and no s & (s.^left + s.^right)
+}
+
+
+sig MulExpression extends ScalarExpression {} 
+fact {
+    all s: MulExpression | 
+        s.variables = s.left.variables + s.right.variables 
+        and (all simId: domain[s.evaluation] |
+               s.evaluation[simId] = mul[int s.left.evaluation[simId], int s.right.evaluation[simId]])
+        and no s & (s.^left + s.^right)
+}
+
+abstract sig Relation {
+ source: one Expression,
+ target: one Variable
+} {
+    source.variables.version = Source
+    target.version = Target
+}
+
+abstract sig ScalarExpression  extends BinaryExpression {}
+abstract sig IndexedExpression extends BinaryExpression {}
+
+sig Equals extends Relation {} {
+  target.type != MappingType and
+  source in (ScalarExpression + SimpleAssignmentExpression) and
+  all simId: domain[source.evaluation + variable.target.value] |
+    target.type = Uint and eq[source.evaluation[simId],variable.target.value[simId]] // TODO target.type
+}
+
+sig EqualsMapping extends Relation {} {}
+fact {
+  all eqmap: EqualsMapping  |
+        eqmap.source in (IndexedExpression + MappingAssignmentExpression) and
+        eqmap.target.type in MappingType and
+        all simId: domain[univ.source.evaluation] |
+                all index: (variable.(univ.target).value[simId].element).univ  |
+                        eq[int eqmap.source.evaluation[simId].element[index],  int variable.(eqmap.target).value[simId].element[index]]
+                
+}
+
+fun domain [r: SimulationId -> (Int + Mapping)] : set SimulationId {
+  r.univ
+}
+
+one sig {% for simulation in simulations %}{{sim_macro(simulation)}}{% if not loop.last %}, {% endif %}{% endfor %} extends SimulationId {}
+
+{% for var in variables -%}
+one sig {{var_macro(var)}} extends Variable {} { name = "{{var.name}}"; type = {{var.type.name}}; version={{version_macro(var.version)}} }
+{% endfor %}
+
+{% for (var, assignments) in assignments_groupedby_variable -%}
+
+{% if var.type.name == 'MappingType' %}
+
+  {% for assignment in assignments %}
+  one sig {{mapping_macro(var, assignment.simulation)}} extends Mapping {} {
+    element = {% for key, value in assignment.value.items() -%} {{key}} -> {{value}} {% if not loop.last %}+ {% endif%} {%- endfor %}
+  }
+  {% endfor %}
+
+one sig {{assignment_sig_macro(var)}} extends Assignment {} {
+  variable = {{var_macro(var)}};
+  value = {% for assignment in assignments %}{{sim_macro(assignment.simulation)}} -> {{mapping_macro(var, assignment.simulation)}} {% if not loop.last %}+ {% endif %}{% endfor%}
+}
+
+
+{% else %}
+one sig {{assignment_sig_macro(var)}} extends Assignment {} {
+  variable = {{var_macro(var)}};
+  value = {% for assignment in assignments %}{{sim_macro(assignment.simulation)}} -> {{value_macro(assignment)}} {% if not loop.last %}+ {% endif %}{% endfor%}
+}
+{% endif %}
+{% endfor %}
+
+
+pred Run {
+all v: Variable | v in Relation.target + Relation.source.variables
+// all v: Variable | v.version in Target implies v in AbsFun.target
+no Expression.left & Expression.right
+#BinaryExpression < 2 //TODO: hardcoded - avoid crazy 
+}
+
+run Run for 5 but {{variables|length // 2}} Relation, {{integer_scope}} Int
+
